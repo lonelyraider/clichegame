@@ -36,7 +36,8 @@
         this.distanceRan = 0;
 
         this.highestScore = 0;
-
+        this.cloudScore=0;
+        this.happyIndex=null;
         this.time = 0;
         this.runningTime = 0;
         this.msPerFrame = 1000 / FPS;
@@ -376,6 +377,8 @@
                 this.spriteDef.TEXT_SPRITE, this.dimensions.WIDTH);
 
             // Draw t-rex
+            this.happyIndex= new happyIndex(this.canvas,
+                this.spriteDef.TEXT_SPRITE, this.dimensions.WIDTH);
             this.tRex = new Trex(this.canvas, this.spriteDef.TREX);
 
             this.outerContainerEl.appendChild(this.containerEl);
@@ -440,6 +443,7 @@
                     this.containerEl.style.width = this.dimensions.WIDTH + 'px';
                     this.containerEl.style.height = this.dimensions.HEIGHT + 'px';
                     this.distanceMeter.update(0, Math.ceil(this.distanceRan));
+
                     this.stop();
                 } else {
                     this.tRex.draw(0, 0);
@@ -547,6 +551,7 @@
                 }
 
                 // Check for collisions.
+                var currTrexCrashTimes=this.tRex.crashTimes;
                 var collision = hasObstacles &&
                     checkForCollision(this.horizon.obstacles[0], this.tRex);
 
@@ -559,7 +564,8 @@
                 } else {
                     this.gameOver();
                 }
-
+                //if(currTrexCrashTimes<this.tRex.crashTimes)
+                this.happyIndex.update(deltaTime,this.tRex.crashTimes);
                 var playAchievementSound = this.distanceMeter.update(deltaTime,
                     Math.ceil(this.distanceRan));
 
@@ -1140,7 +1146,22 @@
                     }
 
                     if (crashed) {
-                        return [adjTrexBox, adjObstacleBox];
+                        if(obstacle.typeConfig.type=='PTERODACTYL'){
+                            tRex.crashTimes++;
+                            console.log(tRex.crashTimes);
+                            var val=tRex.crashTimes;
+                            const para = document.createElement("p");
+const node = document.createTextNode(val);
+para.appendChild(node);
+
+const element = document.getElementById("main-frame-error");
+element.appendChild(para);
+
+                        
+                          
+                            return false;
+                        }
+                        return false;// [adjTrexBox, adjObstacleBox];
                     }
                 }
             }
@@ -1459,7 +1480,7 @@
             yPos: [100, 75, 50], // Variable height.
             yPosMobile: [100, 50], // Variable height mobile.
             multipleSpeed: 999,
-            minSpeed: 8.5,
+            minSpeed: 0,
             minGap: 150,
             collisionBoxes: [
                 new CollisionBox(15, 15, 16, 5),
@@ -1500,7 +1521,7 @@
         this.config = Trex.config;
         // Current status.
         this.status = Trex.status.WAITING;
-
+        this.crashTimes=0
         this.jumping = false;
         this.ducking = false;
         this.jumpVelocity = 0;
@@ -1838,7 +1859,138 @@
         }
     };
 
+    /**
+     * Handles displaying the distance meter.
+     * @param {!HTMLCanvasElement} canvas
+     * @param {Object} spritePos Image position in sprite.
+     * @param {number} canvasWidth
+     * @constructor
+     */
+     function happyIndex(canvas, spritePos, canvasWidth) {
+        this.canvas = canvas;
+        this.canvasCtx = canvas.getContext('2d');
+        this.image = Runner.imageSprite;
+        this.spritePos = spritePos;
+        this.x = -9;
+        this.y = 50;
 
+        this.currentDistance = 0;
+        this.maxScore = 0;
+        this.highScore = 0;
+        this.container = null;
+
+        this.digits = [];
+        this.acheivement = false;
+        this.defaultString = '';
+        this.flashTimer = 0;
+        this.flashIterations = 0;
+        this.invertTrigger = false;
+        this.maxScoreUnits=6;
+
+        this.init(canvasWidth);
+    };
+    happyIndex.prototype = {
+        /**
+         * Initialise the distance meter to '00000'.
+         * @param {number} width Canvas width in px.
+         */
+        init: function (width) {
+            var maxDistanceStr = '';
+
+            this.calcXPos(width);
+            this.maxScore = this.maxScoreUnits;
+            for (var i = 0; i < this.maxScoreUnits; i++) {
+                this.draw(i, 0);
+                this.defaultString += '0';
+                maxDistanceStr += '9';
+            }
+
+            this.maxScore = parseInt(maxDistanceStr);
+        },
+
+        /**
+         * Calculate the xPos in the canvas.
+         * @param {number} canvasWidth
+         */
+        calcXPos: function (canvasWidth) {
+            this.x = canvasWidth - (DistanceMeter.dimensions.DEST_WIDTH *
+                (this.maxScoreUnits + 1));
+        },
+
+        /**
+         * Draw a digit to canvas.
+         * @param {number} digitPos Position of the digit.
+         * @param {number} value Digit value 0-9.
+         * @param {boolean} opt_highScore Whether drawing the high score.
+         */
+        draw: function (digitPos, value, opt_highScore) {
+            var sourceWidth = DistanceMeter.dimensions.WIDTH;
+            var sourceHeight = DistanceMeter.dimensions.HEIGHT;
+            var sourceX = DistanceMeter.dimensions.WIDTH * value;
+            var sourceY = 0;
+
+            var targetX = digitPos * DistanceMeter.dimensions.DEST_WIDTH;
+            var targetY = this.y;
+            var targetWidth = DistanceMeter.dimensions.WIDTH;
+            var targetHeight = DistanceMeter.dimensions.HEIGHT;
+
+            // For high DPI we 2x source values.
+            if (IS_HIDPI) {
+                sourceWidth *= 2;
+                sourceHeight *= 2;
+                sourceX *= 2;
+            }
+
+            sourceX += this.spritePos.x;
+            sourceY += this.spritePos.y;
+
+            this.canvasCtx.save();
+
+           
+                this.canvasCtx.translate(this.x, this.y);
+            
+
+            this.canvasCtx.drawImage(this.image, sourceX, sourceY,
+                sourceWidth, sourceHeight,
+                targetX, targetY,
+                targetWidth, targetHeight
+            );
+
+            this.canvasCtx.restore();
+        },
+        /**
+         * Update the distance meter.
+         * @param {number} distance
+         * @param {number} deltaTime
+         * @return {boolean} Whether the acheivement sound fx should be played.
+         */
+         update: function (deltaTime, distance) {
+            var paint = true;
+            console.log(distance);
+            console.log("i ate one");
+
+          
+
+                    // Create a string representation of the distance with leading 0.
+                    var distanceStr = (this.defaultString +
+                        distance).substr(-this.maxScoreUnits);
+                        
+                    this.digits =  distanceStr.split('');
+               
+              
+            
+
+            // Draw the digits if not flashing.
+            if (paint) {
+                for (var i = this.digits.length - 1; i >= 0; i--) {
+                    this.draw(i, parseInt(this.digits[i]));
+                }
+            }
+
+            return;
+        },
+
+    }
     //******************************************************************************
 
     /**
